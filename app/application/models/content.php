@@ -386,15 +386,28 @@ class Content extends Koken
                     unlink($midsize);
                 }
 
+                // Does this upload carry an HDR gain map? If so, ingestion must
+                // not flatten it to SDR (in-place rotation below would do exactly
+                // that with the standard drivers).
+                include_once(FCPATH . 'app' . DIRECTORY_SEPARATOR . 'koken' . DIRECTORY_SEPARATOR . 'GainMap.php');
+                $is_hdr = defined('ULTRAHDR_PATH') && GainMap::detect($path);
+
                 $orientation = $exif['IFD0']['Orientation'] ?? false;
 
                 if (in_array($orientation, array(3, 6, 8), true)) {
-                    include_once(FCPATH . 'app' . DIRECTORY_SEPARATOR . 'koken' . DIRECTORY_SEPARATOR . 'DarkroomUtils.php');
+                    if ($is_hdr) {
+                        // Gain-map-aware rotation: keeps the HDR intent intact.
+                        include_once(FCPATH . 'app' . DIRECTORY_SEPARATOR . 'koken' . DIRECTORY_SEPARATOR . 'Darkroom' . DIRECTORY_SEPARATOR . 'Darkroom.php');
+                        include_once(FCPATH . 'app' . DIRECTORY_SEPARATOR . 'koken' . DIRECTORY_SEPARATOR . 'Darkroom' . DIRECTORY_SEPARATOR . 'DarkroomUltraHDR.php');
+                        $d = new DarkroomUltraHDR();
+                    } else {
+                        include_once(FCPATH . 'app' . DIRECTORY_SEPARATOR . 'koken' . DIRECTORY_SEPARATOR . 'DarkroomUtils.php');
 
-                    $s = new Setting();
-                    $s->where('name', 'image_processing_library')->get();
+                        $s = new Setting();
+                        $s->where('name', 'image_processing_library')->get();
 
-                    $d = DarkroomUtils::init($s->value);
+                        $d = DarkroomUtils::init($s->value);
+                    }
 
                     switch ($orientation) {
                         case 3:
