@@ -80,9 +80,12 @@ class DarkroomUltraHDR extends Darkroom
             $q = 95;
         }
 
-        // Base: physically rotate and mark orientation as normal (TopLeft).
+        // Base: physically rotate, then strip metadata except ICC (the physical
+        // rotation makes the EXIF orientation tag unnecessary, and a retained
+        // Exif/thumbnail would break the re-mux — see compose()).
         $this->run($this->magick() . ' ' . escapeshellarg($path . '[0]')
-            . ' -rotate ' . $degrees . ' -orient TopLeft'
+            . ' -rotate ' . $degrees
+            . " +profile '!icc,*'"
             . ' -quality ' . $q . ' ' . escapeshellarg($base));
 
         $gmBytes = GainMap::extractGainMap($path);
@@ -162,10 +165,13 @@ class DarkroomUltraHDR extends Darkroom
             $unsharp = " -unsharp 0x{$sigma}+{$this->sharpening}+0.05";
         }
 
-        // 1. Base: primary image, resized/cropped. Keep its ICC profile (colour)
-        //    and EXIF orientation; ImageMagick won't re-add an MPF index here.
+        // 1. Base: primary image, resized/cropped. Strip metadata but KEEP the
+        //    ICC profile: a retained Exif/thumbnail (or stale MPF) confuses
+        //    ultrahdr_app's muxing and produces a corrupt multi-SOI JPEG.
+        //    `+profile '!icc,*'` drops everything except colour.
         $this->run($this->magick() . ' ' . escapeshellarg($source . '[0]')
             . ' ' . $geom . $unsharp
+            . " +profile '!icc,*'"
             . ' -quality ' . (int) $this->quality
             . ' ' . escapeshellarg($base));
 
