@@ -35,7 +35,24 @@ usage() { echo "usage: $(basename "$0") <input.MOV> [output.mp4]" >&2; exit 1; }
 [ $# -ge 1 ] || usage
 
 IN=$1
-OUT=${2:-${IN%.*}.mp4}
+
+# The site detects spatial clips by filename (/-spatial\.mp4$/i), so the
+# default output carries that suffix. Koken slugifies on upload but keeps it:
+# IMG_5152-spatial.mp4 is stored as IMG-5152-spatial.mp4, which still matches.
+if [ $# -ge 2 ]; then
+  OUT=$2
+else
+  stem=${IN%.*}
+  case "$stem" in
+    *-spatial | *_spatial) OUT="${stem}.mp4" ;;
+    *) OUT="${stem}-spatial.mp4" ;;
+  esac
+fi
+
+case "$OUT" in
+  *-spatial.mp4 | *_spatial.mp4) ;;
+  *) echo "warn: '$OUT' lacks a -spatial suffix; the site will treat it as a regular video" >&2 ;;
+esac
 TMP=$(mktemp -t spatial2mp4)-remux.mp4
 trap 'rm -f "$TMP"' EXIT
 
