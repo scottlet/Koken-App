@@ -73,15 +73,29 @@ AAC=$(ffprobe -v error -select_streams a -show_entries stream=index,codec_name \
         -of csv=p=0 "$IN" | awk -F, '$2=="aac"{print $1; exit}')
 if [ -n "$AAC" ]; then MAPA=(-map "0:$AAC"); else MAPA=(); echo "warn: no AAC track; output will be silent" >&2; fi
 
+# 2b. ffmpeg drops creation_time on a stream copy, so read it now and hand it
+#     back in below. Without this every conversion is stamped with the date it
+#     was converted rather than the date it was shot.
+CREATED=$(ffprobe -v error -show_entries format_tags=creation_time \
+            -of default=nw=1:nk=1 "$IN" 2>/dev/null || true)
+if [ -n "$CREATED" ]; then CTIME=(-metadata "creation_time=$CREATED"); else CTIME=(); fi
+
 # 3. Container swap only - the MV-HEVC bitstream (both layers) is copied verbatim.
 ffmpeg -y -hide_banner -loglevel error \
   -i "$IN" -map 0:v:0 "${MAPA[@]}" \
-  -c copy -tag:v hvc1 -movflags +faststart "$TMP"
+  -c copy -tag:v hvc1 -movflags +faststart "${CTIME[@]}" "$TMP"
 
 # 4. Re-stamp the spatial metadata ffmpeg dropped.
 spatial metadata -i "$TMP" -o "$OUT" -y --set "$SET" >/dev/null
 
-# 5. Verify rather than assume.
+# 5. Match the source's filesystem timestamps. touch covers mtime; the macOS
+#    creation date needs SetFile, which is absent on a bare system.
+touch -r "$IN" "$OUT"
+if command -v SetFile >/dev/null 2>&1; then
+  SetFile -d "$(stat -f '%SB' -t '%m/%d/%Y %H:%M:%S' "$IN")" "$OUT" 2>/dev/null || true
+fi
+
+# 6. Verify rather than assume.
 if ! spatial metadata -i "$OUT" 2>/dev/null | grep -q 'hasRightEyeView[[:space:]]*=[[:space:]]*true'; then
   echo "error: verification failed - right eye not declared in $OUT" >&2; exit 1
 fi
