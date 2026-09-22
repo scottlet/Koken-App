@@ -286,7 +286,9 @@ return  [
                     'constraint' => 255
                 ],
                 'filesize' => [
-                    'type' => 'INT'
+                    // BIGINT, not INT: a signed INT caps at 2147483647, so any
+                    // upload over 2GB fails the insert and surfaces as a 400.
+                    'type' => 'BIGINT'
                 ],
                 'width' => [
                     'type' => 'INT',

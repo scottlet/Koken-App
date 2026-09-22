@@ -206,20 +206,49 @@
 				$sh /= 100;
 			}
 
-			$d = DarkroomUtils::init($settings['image_processing_library']);
-
-			// TODO: Fix these create_function calls once we go 5.3
-			if ($settings['image_processing_library'] === 'imagick')
+			// HDR: when the original carries a gain map and HDR output is enabled
+			// for this preset, route through the gain-map-aware driver so the
+			// derivative stays HDR. Output is still a .jpg, so nothing downstream
+			// (routing, MIME, markup) changes — only the resize path differs.
+			$hdr = false;
+			if (defined('ULTRAHDR_PATH') && !$remoteSource)
 			{
-				$d->beforeRender(function($imObject, $options, $content) { return Shutter::filter('darkroom.render.imagick', array($imObject, $options, $content));}, $content);
+				$hdr_presets = defined('KOKEN_HDR_PRESETS') ? array_map('trim', explode(',', KOKEN_HDR_PRESETS)) : array('xlarge', 'huge');
+				$hdr_eligible = $preset ? in_array($matches[3], $hdr_presets, true) : (max($w, $h) >= 1600);
+				if ($hdr_eligible)
+				{
+					require_once($root . $ds . 'app' . $ds . 'koken' . $ds . 'GainMap.php');
+					$hdr = GainMap::detect($original);
+				}
 			}
-			else if (strpos($settings['image_processing_library'], 'convert') !== false)
+
+			if ($hdr)
 			{
-				$d->beforeRender(function($cmd, $options, $content) {return Shutter::filter('darkroom.render.imagemagick', array($cmd, $options, $content));}, $content);
+				require_once($root . $ds . 'app' . $ds . 'koken' . $ds . 'Darkroom' . $ds . 'Darkroom.php');
+				require_once($root . $ds . 'app' . $ds . 'koken' . $ds . 'Darkroom' . $ds . 'DarkroomUltraHDR.php');
+				$d = new DarkroomUltraHDR(array(
+					'thread' => defined('DARKROOM_MAGICK_THREADS') ? DARKROOM_MAGICK_THREADS : 1,
+					'memory' => defined('DARKROOM_MAGICK_MEMORY') ? DARKROOM_MAGICK_MEMORY : 67108864,
+					'map' => defined('DARKROOM_MAGICK_MAP') ? DARKROOM_MAGICK_MAP : 128217728,
+				));
 			}
 			else
 			{
-				$d->beforeRender(function($gdObject, $options, $content) { return Shutter::filter('darkroom.render.gd', array($gdObject, $options, $content));}, $content);
+				$d = DarkroomUtils::init($settings['image_processing_library']);
+
+				// TODO: Fix these create_function calls once we go 5.3
+				if ($settings['image_processing_library'] === 'imagick')
+				{
+					$d->beforeRender(function($imObject, $options, $content) { return Shutter::filter('darkroom.render.imagick', array($imObject, $options, $content));}, $content);
+				}
+				else if (strpos($settings['image_processing_library'], 'convert') !== false)
+				{
+					$d->beforeRender(function($cmd, $options, $content) {return Shutter::filter('darkroom.render.imagemagick', array($cmd, $options, $content));}, $content);
+				}
+				else
+				{
+					$d->beforeRender(function($gdObject, $options, $content) { return Shutter::filter('darkroom.render.gd', array($gdObject, $options, $content));}, $content);
+				}
 			}
 
 			$midsize = preg_replace('/\.' . $info['extension'] . '$/', '.1600.' . $info['extension'], $original);
@@ -237,8 +266,10 @@
 					$d->alternate($content['original']['midsize']);
 				}
 			}
-			else if (file_exists($midsize))
+			else if (!$hdr && file_exists($midsize))
 			{
+				// HDR sources skip the SDR .1600 midsize — it has no gain map and
+				// would be used as the resize source, flattening the result to SDR.
 				$d->alternate($midsize);
 			}
 
@@ -247,8 +278,10 @@
 				$d->retina();
 			}
 
-			if (!$settings['retain_image_metadata'] || max($w, $h) < 480 || $settings['image_processing_library'] === 'gd')
+			if (!$hdr && (!$settings['retain_image_metadata'] || max($w, $h) < 480 || $settings['image_processing_library'] === 'gd'))
 			{
+				// HDR output is never stripped / ICC-reinjected: that path rewrites
+				// the JPEG and would corrupt the multi-image gain-map structure.
 				// Work around issue with mbstring.func_overload = 2
 				if ((ini_get('mbstring.func_overload') & 2) && function_exists('mb_internal_encoding')) {
 					$previous_encoding = mb_internal_encoding();
