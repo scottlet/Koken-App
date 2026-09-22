@@ -4,6 +4,14 @@
 
 This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) with a few additions on top. Everything below this section is the original README.
 
+**Current release: [1.3.3-hdr.3](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-hdr.3)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-hdr.N`. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
+
+| Tag | What changed |
+|---|---|
+| 1.3.3-hdr.1 | HDR gain-map output via libultrahdr |
+| 1.3.3-hdr.2 | Fix corrupt HDR output when the base image carried Exif |
+| 1.3.3-hdr.3 | Spatial video tool, BIGINT filesize, creation date carried through conversion, 500-item content listing cap removed |
+
 ### HDR (gain-map) images
 
 Uploaded JPEGs that carry an ISO 21496-1 / Ultra HDR gain map (iPhone, Pixel, Lightroom exports) are served as HDR at the larger size presets instead of being flattened to SDR when Koken resizes them. Resizing goes through [libultrahdr](https://github.com/google/libultrahdr), which scales the base image and the gain map together and re-muxes them, so the derivative is still a plain `.jpg` and nothing downstream changes. Smaller presets stay SDR using the gain map's built-in fallback.
