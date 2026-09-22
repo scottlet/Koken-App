@@ -1617,7 +1617,7 @@ class Content extends Koken
             $options['order_by'] = 'width * height';
         }
         if (is_numeric($options['limit']) && $options['limit'] > 0) {
-            $options['limit'] = min($options['limit'], 500);
+            $options['limit'] = (int) $options['limit'];
         } else {
             $options['limit'] = 100;
         }
