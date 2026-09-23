@@ -4,13 +4,14 @@
 
 This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) with a few additions on top. Everything below this section is the original README.
 
-**Current release: [1.3.3-hdr.3](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-hdr.3)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-hdr.N`. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
+**Current release: [1.3.3-hdr.4](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-hdr.4)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-hdr.N`. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
 
 | Tag | What changed |
 |---|---|
 | 1.3.3-hdr.1 | HDR gain-map output via libultrahdr |
 | 1.3.3-hdr.2 | Fix corrupt HDR output when the base image carried Exif |
 | 1.3.3-hdr.3 | Spatial video tool, BIGINT filesize, creation date carried through conversion, 500-item content listing cap removed |
+| 1.3.3-hdr.4 | Spatial tool gains `-b` re-encode and `-Y`/`-N` YouTube 3D output; videos get `captured_on` from their creation date |
 
 ### HDR (gain-map) images
 
