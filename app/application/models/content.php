@@ -330,6 +330,17 @@ class Content extends Koken
                     $this->duration = $ffmpeg->duration();
                     list($this->width, $this->height) = $ffmpeg->dimensions();
                     $this->lg_preview = $ffmpeg->create_thumbs();
+
+                    // Videos have no EXIF, but the container's creation_time is
+                    // the moment of capture. It is a UTC instant, whereas photo
+                    // EXIF dates are local wall-clock strings that parse_captured()
+                    // feeds to strtotime() as-is. Shift it into the site timezone
+                    // and parse the wall-clock the same way, so a photo and a
+                    // video shot together sort together.
+                    $created = $ffmpeg->creation_time();
+                    if ($created) {
+                        $this->captured_on = $this->utc_to_site_wallclock($created);
+                    }
                 }
             } else {
                 list($this->width, $this->height) = getimagesize($path);
@@ -605,6 +616,28 @@ class Content extends Koken
                 DIRECTORY_SEPARATOR . 'originals' .
                 DIRECTORY_SEPARATOR . $this->path .
                 DIRECTORY_SEPARATOR . basename($this->filename);
+    }
+
+    /**
+     * Turn a UTC instant into the timestamp Koken would have stored had the
+     * same moment arrived as an EXIF wall-clock string: format it in the site
+     * timezone, then let strtotime() read it under PHP's default timezone,
+     * exactly as parse_captured() does for photos.
+     */
+    public function utc_to_site_wallclock($utc_timestamp)
+    {
+        $tz = 'UTC';
+        $s = new Setting();
+        $s->where('name', 'site_timezone')->get();
+        if (!empty($s->value) && in_array($s->value, timezone_identifiers_list(), true)) {
+            $tz = $s->value;
+        }
+
+        $dt = new DateTime('@' . (int) $utc_timestamp);
+        $dt->setTimezone(new DateTimeZone($tz));
+        $wallclock = strtotime($dt->format('Y-m-d H:i:s'));
+
+        return $wallclock > 0 ? $wallclock : (int) $utc_timestamp;
     }
 
     public function parse_captured($iptc, $exif)

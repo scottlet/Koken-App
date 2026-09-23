@@ -95,6 +95,29 @@ class FFmpeg
         }
     }
 
+    /**
+     * The container's creation_time as a Unix timestamp, or null if absent.
+     *
+     * ffmpeg prints it in the same `-i` dump used for duration/dimensions,
+     * as an ISO-8601 UTC instant (e.g. 2026-09-15T05:51:11.000000Z). The
+     * first occurrence is the format-level tag; stream-level copies follow.
+     */
+    public function creation_time()
+    {
+        if (is_null($this->info)) {
+            $this->info();
+        }
+
+        foreach ($this->info as $line) {
+            if (preg_match('/^\s*creation_time\s*:\s*(\S+)/', $line, $matches)) {
+                $ts = strtotime($matches[1]);
+                return $ts > 0 ? $ts : null;
+            }
+        }
+
+        return null;
+    }
+
     public function duration()
     {
         if ($this->duration > 0) {
