@@ -31,8 +31,11 @@ The original's creation date is carried through the conversion.
 `tools/spatial2mp4.sh` converts an Apple spatial video `.MOV` into an `.mp4` that Koken can serve and Safari on Apple Vision Pro will play in stereo. It is a container swap only, so the stereo bitstream is copied verbatim, the Apple spatial metadata (`vexu` and friends) is re-stamped, `moov` is moved to the front for streaming, and the non-web audio and metadata tracks are dropped. Output is named with a `-spatial` suffix by default.
 
 ```
-tools/spatial2mp4.sh <input.MOV> [output.mp4]
+tools/spatial2mp4.sh [-b <bitrate>] [-Y] <input.MOV> [output.mp4]
 ```
+
+- `-b <bitrate>` re-encodes both eyes at that video bitrate through `spatial make` instead of copying the original bitstream. iPhone originals run at about 25 Mbps for 1080p. Measured against the original, `8M` scores VMAF 95 (visually transparent) at roughly a third of the size, `12M` scores 98, and `6M` drops to 90 with visible softening in the worst frames. Audio is still copied from the original. Apple Silicon only.
+- `-Y` also writes `<stem>-sbs3d.mov`, a full-width side-by-side file with an `st3d` box, which YouTube recognises as 3D on upload.
 
 Requires ffmpeg 7.1 or later and the [`spatial`](https://blog.mikeswanson.com) CLI.
 
