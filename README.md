@@ -4,7 +4,7 @@
 
 This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) with a few additions on top. Everything below this section is the original README.
 
-**Current release: [1.3.3-hdr.5](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-hdr.5)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-hdr.N`. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
+**Current release: [1.3.3-sjp.6](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.6)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
 
 | Tag | What changed |
 |---|---|
@@ -13,8 +13,9 @@ This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) 
 | 1.3.3-hdr.3 | Spatial video tool, BIGINT filesize, creation date carried through conversion, 500-item content listing cap removed |
 | 1.3.3-hdr.4 | Spatial tool gains `-b` re-encode and `-Y`/`-N` YouTube 3D output; videos get `captured_on` from their creation date |
 | 1.3.3-hdr.5 | Fork build shown beside the version in the admin and returned by `/system` |
+| 1.3.3-sjp.6 | Videos shorter than 4 seconds no longer fail on upload; tag suffix changed from `hdr` to `sjp` |
 
-The admin shows the fork build beside the version, for example "1.3.3 (hdr.5)", under Settings and in the About panel. It comes from `KOKEN_FORK_VERSION` in `app/application/config/koken.php`, which is bumped with each fork tag, and is also returned as `fork_version` by the `/system` API call.
+The admin shows the fork build beside the version, for example "1.3.3 (sjp.6)", under Settings and in the About panel. It comes from `KOKEN_FORK_VERSION` in `app/application/config/koken.php`, which is bumped with each fork tag, and is also returned as `fork_version` by the `/system` API call.
 
 ### HDR (gain-map) images
 

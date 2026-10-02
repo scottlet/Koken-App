@@ -50,11 +50,11 @@ if (!defined('AUTO_UPDATE')) {
 // Director constants
 define('KOKEN_VERSION', '1.3.3');
 
-// Fork build, shown next to the version in the admin (e.g. "1.3.3 (hdr.5)").
+// Fork build, shown next to the version in the admin (e.g. "1.3.3 (sjp.6)").
 // Kept separate from KOKEN_VERSION on purpose: that one is compared against the
 // update server, used as the theme asset cache-buster and sent in the user
 // agent, so it must keep matching upstream. Bump this with each fork tag.
-define('KOKEN_FORK_VERSION', 'hdr.5');
+define('KOKEN_FORK_VERSION', 'sjp.6');
 
 /* End of file koken.php */
 /* Location: ./system/application/config/koken.php */
