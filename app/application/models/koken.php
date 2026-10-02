@@ -76,16 +76,32 @@ class Koken extends DataMapper
                 $this->where_in('id', $content_ids);
             }
         } else {
-            $this->distinct();
-            $this->group_start();
+            // Resolve the names first. If none of them is a real tag, an
+            // empty group_start()/group_end() pair would emit "()" and the
+            // query would die with a SQL syntax error (a bare 500 for every
+            // admin search on a word that is not an exact tag name). Match
+            // nothing instead, the same way a missing category is handled.
+            $tag_ids = [];
 
             foreach ($tags as $tag) {
                 $t = new Tag();
                 $t->where('name', $tag)->get();
 
                 if ($t->exists()) {
-                    $this->or_where_related('tag', 'id', $t->id);
+                    $tag_ids[] = $t->id;
                 }
+            }
+
+            if (empty($tag_ids)) {
+                $this->where_related('tag', 'id', 0);
+                return;
+            }
+
+            $this->distinct();
+            $this->group_start();
+
+            foreach ($tag_ids as $tag_id) {
+                $this->or_where_related('tag', 'id', $tag_id);
             }
             $this->group_end();
         }
