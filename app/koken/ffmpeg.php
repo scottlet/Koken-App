@@ -61,6 +61,17 @@ class FFmpeg
             $i += $bits;
         }
 
+        // Clips under ~4s produce no sample points above (the loop starts at
+        // 1s and stops 2s short of the end). An empty command list used to be
+        // a harmless warning; on PHP 8 exec('') is a fatal ValueError, which
+        // surfaced as a bare 500 on upload. Take one frame from the midpoint
+        // instead so every video gets a preview.
+        if (empty($cmd)) {
+            $mid = (int) max(0, floor($this->duration() / 2));
+            $mid_str = str_pad($mid, 5, '0', STR_PAD_LEFT);
+            $cmd[] = $this->ffmpeg . " -ss $mid -i \"{$this->path}\" -vframes 1 -an -f mjpeg \"$mid_str.jpg\"";
+        }
+
         chdir($target_directory);
         if (DIRECTORY_SEPARATOR == '\\') {
             foreach ($cmd as $c) {
