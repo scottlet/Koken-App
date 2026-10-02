@@ -106,7 +106,7 @@
 					<div>Version of Koken this installation is using.</div>
 				</div>
 				<div class="mid-wrap">
-					<span data-bind="text: $root.system.version"></span>&nbsp;&nbsp;
+					<span data-bind="text: $root.system.fork_version ? $root.system.version + ' (' + $root.system.fork_version + ')' : $root.system.version"></span>&nbsp;&nbsp;
 					<!-- ko ifnot: settings.disable_auto_updates -->
 					<a href="#" class="button sm" data-event="install_release" data-bind="visible: $root.interfaces.app.observers.update_available_version">
 						Update now

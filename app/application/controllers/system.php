@@ -95,6 +95,7 @@ class System extends Koken_Controller
 
         $data = array(
             'version' => KOKEN_VERSION,
+            'fork_version' => KOKEN_FORK_VERSION,
             'max_parallel_requests' => $parallel,
         );
 

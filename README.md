@@ -13,6 +13,8 @@ This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) 
 | 1.3.3-hdr.3 | Spatial video tool, BIGINT filesize, creation date carried through conversion, 500-item content listing cap removed |
 | 1.3.3-hdr.4 | Spatial tool gains `-b` re-encode and `-Y`/`-N` YouTube 3D output; videos get `captured_on` from their creation date |
 
+The admin shows the fork build beside the version, for example "1.3.3 (hdr.5)", under Settings and in the About panel. It comes from `KOKEN_FORK_VERSION` in `app/application/config/koken.php`, which is bumped with each fork tag, and is also returned as `fork_version` by the `/system` API call.
+
 ### HDR (gain-map) images
 
 Uploaded JPEGs that carry an ISO 21496-1 / Ultra HDR gain map (iPhone, Pixel, Lightroom exports) are served as HDR at the larger size presets instead of being flattened to SDR when Koken resizes them. Resizing goes through [libultrahdr](https://github.com/google/libultrahdr), which scales the base image and the gain map together and re-muxes them, so the derivative is still a plain `.jpg` and nothing downstream changes. Smaller presets stay SDR using the gain map's built-in fallback.
