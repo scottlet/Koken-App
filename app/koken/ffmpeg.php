@@ -107,6 +107,59 @@ class FFmpeg
     }
 
     /**
+     * Move the moov atom to the front of the file in place, so browsers can
+     * start playback before the whole file has downloaded. Phones write it at
+     * the end.
+     *
+     * Uses qt-faststart rather than an ffmpeg remux on purpose: ffmpeg's mp4
+     * muxer drops Apple's vexu box (flattening spatial video to mono) and
+     * refuses the metadata tracks some phones add. qt-faststart only reorders
+     * atoms and patches chunk offsets; every other byte is preserved.
+     *
+     * Returns true if the file was rewritten, false if it was left alone
+     * (already faststart, tool missing, or any failure). The original is
+     * only replaced once a complete output exists.
+     */
+    public function faststart()
+    {
+        if (!function_exists('exec') || !defined('QT_FASTSTART_PATH_FINAL')) {
+            return false;
+        }
+
+        $bin = QT_FASTSTART_PATH_FINAL;
+        if (str_contains($bin, DIRECTORY_SEPARATOR)) {
+            if (!is_executable($bin)) {
+                return false;
+            }
+        } else {
+            exec('command -v ' . escapeshellarg($bin) . ' 2>/dev/null', $found, $status);
+            if ($status !== 0 || empty($found)) {
+                return false;
+            }
+        }
+
+        $tmp = $this->path . '.faststart.tmp';
+        @unlink($tmp);
+
+        // qt-faststart exits 0 and writes nothing when moov is already first,
+        // so the presence of the output file is the signal, not the exit code.
+        exec(escapeshellarg($bin) . ' ' . escapeshellarg($this->path) . ' ' . escapeshellarg($tmp) . ' 2>&1', $out, $status);
+
+        if ($status !== 0 || !file_exists($tmp)) {
+            @unlink($tmp);
+            return false;
+        }
+
+        if (filesize($tmp) !== filesize($this->path) || !rename($tmp, $this->path)) {
+            @unlink($tmp);
+            return false;
+        }
+
+        // Cached ffmpeg -i output stays valid: the streams are untouched.
+        return true;
+    }
+
+    /**
      * The container's creation_time as a Unix timestamp, or null if absent.
      *
      * ffmpeg prints it in the same `-i` dump used for duration/dimensions,

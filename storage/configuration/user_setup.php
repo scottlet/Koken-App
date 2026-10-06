@@ -6,6 +6,12 @@
 	// Path to ffmpeg on your server
 	define('FFMPEG_PATH', 'ffmpeg');
 
+	// Path to qt-faststart, used to move the moov atom to the front of uploaded
+	// videos so playback can start before the whole file has downloaded. It is
+	// found next to ffmpeg (or on PATH) by default; set this if it lives elsewhere.
+	// Uploads are left untouched if it cannot be found.
+	// define('QT_FASTSTART_PATH', '/usr/bin/qt-faststart');
+
 	// Path to the libultrahdr CLI (ultrahdr_app), used to resize HDR / gain-map
 	// images without destroying the gain map. Uncomment and set to enable HDR output.
 	// define('ULTRAHDR_PATH', '/usr/local/bin/ultrahdr_app');

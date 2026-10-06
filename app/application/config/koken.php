@@ -43,6 +43,16 @@ if (!defined('FFMPEG_PATH')) {
     define('FFMPEG_PATH_FINAL', FFMPEG_PATH);
 }
 
+// qt-faststart ships alongside ffmpeg. Unless configured, look for it next to
+// the ffmpeg binary when that is an explicit path, otherwise on PATH.
+if (defined('QT_FASTSTART_PATH')) {
+    define('QT_FASTSTART_PATH_FINAL', QT_FASTSTART_PATH);
+} elseif (str_contains(FFMPEG_PATH_FINAL, DIRECTORY_SEPARATOR)) {
+    define('QT_FASTSTART_PATH_FINAL', dirname(FFMPEG_PATH_FINAL) . DIRECTORY_SEPARATOR . 'qt-faststart');
+} else {
+    define('QT_FASTSTART_PATH_FINAL', 'qt-faststart');
+}
+
 if (!defined('AUTO_UPDATE')) {
     define('AUTO_UPDATE', true);
 }

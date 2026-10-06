@@ -331,6 +331,11 @@ class Content extends Koken
                     list($this->width, $this->height) = $ffmpeg->dimensions();
                     $this->lg_preview = $ffmpeg->create_thumbs();
 
+                    // Originals are served byte-for-byte, so make sure the
+                    // moov atom is at the front or playback cannot begin until
+                    // the whole file has downloaded. Safe for spatial video.
+                    $ffmpeg->faststart();
+
                     // Videos have no EXIF, but the container's creation_time is
                     // the moment of capture. It is a UTC instant, whereas photo
                     // EXIF dates are local wall-clock strings that parse_captured()

@@ -48,6 +48,8 @@ Requires ffmpeg 7.1 or later and the [`spatial`](https://blog.mikeswanson.com) C
 ### Other changes
 
 - `content.filesize` is now a `BIGINT`, so uploads over 2 GB no longer fail (migration 0043).
+- Uploaded videos get their `moov` atom moved to the front with `qt-faststart`, so playback can start before the whole file has downloaded. Phones write it at the end. `qt-faststart` ships with ffmpeg and is looked for next to the ffmpeg binary or on `PATH`; set `QT_FASTSTART_PATH` in `user_setup.php` if it lives elsewhere. Uploads are left untouched if it is missing. Unlike an ffmpeg remux, this preserves spatial video and phone metadata tracks byte for byte.
+- Videos shorter than 4 seconds no longer fail on upload, and every video gets its shot date as `captured_on`.
 - The 500-item cap on `/content` API listings has been removed. The default page size is still 100 when no `limit` is passed. API responses are cached per URL, so a large page is only built once per cache purge.
 
 ---
