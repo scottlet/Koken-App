@@ -64,7 +64,7 @@ define('KOKEN_VERSION', '1.3.3');
 // Kept separate from KOKEN_VERSION on purpose: that one is compared against the
 // update server, used as the theme asset cache-buster and sent in the user
 // agent, so it must keep matching upstream. Bump this with each fork tag.
-define('KOKEN_FORK_VERSION', 'sjp.10');
+define('KOKEN_FORK_VERSION', 'sjp.11');
 
 /* End of file koken.php */
 /* Location: ./system/application/config/koken.php */

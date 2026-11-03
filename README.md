@@ -4,7 +4,7 @@
 
 This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) with a few additions on top. Everything below this section is the original README.
 
-**Current release: [1.3.3-sjp.10](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.10)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
+**Current release: [1.3.3-sjp.11](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.11)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
 
 | Tag | What changed |
 |---|---|
@@ -18,6 +18,7 @@ This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) 
 | 1.3.3-sjp.8 | Uploaded videos get `moov` moved to the front with `qt-faststart`, spatial-safe |
 | 1.3.3-sjp.9 | Video posters are the first frame of the video, one file per upload, instead of up to twelve unused frames and a random pick; `tools/regen-video-posters.php` fixes existing videos |
 | 1.3.3-sjp.10 | Any rendition can be requested as WebP by asking for `.webp` instead of the original's extension; the colour profile is kept, HDR presets stay JPEG |
+| 1.3.3-sjp.11 | HDR renders four to twenty times faster: DCT-scaled decode of the base and the gain map, both resized in parallel, metadata cache moved under `storage/cache`; 2x WebP quality floor lowered to 35 |
 
 The complete list of changes relative to upstream, with commits and files, is kept in [docs/DEVIATIONS.md](docs/DEVIATIONS.md).
 
@@ -36,6 +37,8 @@ define('KOKEN_HDR_PRESETS', 'xlarge,huge');
 ```
 
 The original's creation date is carried through the conversion.
+
+Resource limits for the `convert` and `ultrahdr_app` calls come from `DARKROOM_MAGICK_THREADS`, `DARKROOM_MAGICK_MEMORY` and `DARKROOM_MAGICK_MAP` in `user_setup.php` (the same defines the Imagick and ImageMagick libraries use). The gain-map metadata for each original is decoded once and cached in `storage/cache/uhdr/`.
 
 ### WebP renditions
 

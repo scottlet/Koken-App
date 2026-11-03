@@ -12,7 +12,7 @@ require_once dirname(__DIR__) . '/GainMap.php';
  *
  *   1. base   = primary SDR image, resized/cropped with ImageMagick (keeps ICC).
  *   2. gainmap = the MPF secondary image (extracted in pure PHP by GainMap),
- *                normalised to the base resolution then resized/cropped the same.
+ *                resized/cropped to exactly the base's final size.
  *   3. meta   = the gain-map metadata (maxContentBoost, gamma, …), pulled once
  *               via `ultrahdr_app -m 1` and cached (it is resolution-independent).
  *   4. mux    = `ultrahdr_app -m 0 -i base -g gainmap -f meta` (encode scenario 4).
@@ -21,6 +21,17 @@ require_once dirname(__DIR__) . '/GainMap.php';
  * ->sharpen()->focus()->render() pipeline the rest of Koken uses. If anything in
  * the HDR path fails (missing tooling, odd file), it falls back to emitting the
  * SDR base so a valid image is always returned.
+ *
+ * Cost notes. A 45-megapixel original decodes in a fraction of the time when
+ * libjpeg is told the size wanted up front (`-define jpeg:size`, DCT scaling),
+ * so both the base and the gain map (which Adobe writes at full resolution)
+ * are read with a hint of twice the target, side by side, and the gain map is
+ * scaled straight to the base's final size instead of being normalised to the
+ * original's resolution first. The metadata
+ * decode is the single most expensive step and never changes for a given
+ * file, so its cache lives under storage/cache (which survives php-fpm
+ * restarts, unlike the service's private /tmp) and the resource limits from
+ * DARKROOM_MAGICK_* are passed to every convert call.
  */
 class DarkroomUltraHDR extends Darkroom
 {
@@ -28,7 +39,11 @@ class DarkroomUltraHDR extends Darkroom
 
     public function __construct($limits = array())
     {
-        $this->limits = $limits;
+        $this->limits = array_merge(array(
+            'thread' => false,
+            'memory' => false,
+            'map' => false,
+        ), $limits);
 
         $memory_limit = (int) ini_get('memory_limit');
         if (is_numeric($memory_limit) && $memory_limit < 256) {
@@ -44,6 +59,18 @@ class DarkroomUltraHDR extends Darkroom
     private function uhdr()
     {
         return defined('ULTRAHDR_PATH') ? ULTRAHDR_PATH : 'ultrahdr_app';
+    }
+
+    /** `-limit` arguments for convert, from the DARKROOM_MAGICK_* defines. */
+    private function limitArgs()
+    {
+        $args = '';
+        foreach (array('thread', 'memory', 'map') as $name) {
+            if ($this->limits[$name]) {
+                $args .= ' -limit ' . $name . ' ' . (int) $this->limits[$name];
+            }
+        }
+        return $args;
     }
 
     public function getQuality()
@@ -83,7 +110,7 @@ class DarkroomUltraHDR extends Darkroom
         // Base: physically rotate, then strip metadata except ICC (the physical
         // rotation makes the EXIF orientation tag unnecessary, and a retained
         // Exif/thumbnail would break the re-mux — see compose()).
-        $this->run($this->magick() . ' ' . escapeshellarg($path . '[0]')
+        $this->run($this->magick() . $this->limitArgs() . ' ' . escapeshellarg($path . '[0]')
             . ' -rotate ' . $degrees
             . " +profile '!icc,*'"
             . ' -quality ' . $q . ' ' . escapeshellarg($base));
@@ -91,7 +118,7 @@ class DarkroomUltraHDR extends Darkroom
         $gmBytes = GainMap::extractGainMap($path);
         if ($gmBytes !== false && file_exists($base)) {
             file_put_contents($gm, $gmBytes);
-            $this->run($this->magick() . ' ' . escapeshellarg($gm)
+            $this->run($this->magick() . $this->limitArgs() . ' ' . escapeshellarg($gm)
                 . ' -rotate ' . $degrees . ' -strip ' . escapeshellarg($gm));
 
             $meta = $this->metaConfig($path, $work);
@@ -120,8 +147,16 @@ class DarkroomUltraHDR extends Darkroom
             return $this->emit(file_get_contents($this->sourcePath));
         }
 
-        $geom = '-resize ' . (int) $this->width . 'x' . (int) $this->height;
-        return $this->emit($this->compose($this->sourcePath, $geom, true));
+        $w = (int) $this->width;
+        $h = (int) $this->height;
+
+        return $this->emit($this->compose(
+            $this->sourcePath,
+            '-resize ' . $w . 'x' . $h,
+            $w,
+            $h,
+            true
+        ));
     }
 
     public function createCroppedImage($interstitialWidth, $interstitialHeight, $cropX, $cropY)
@@ -137,22 +172,32 @@ class DarkroomUltraHDR extends Darkroom
               . '+' . (int) $cropX . '+' . (int) $cropY
               . ' +repage';
 
-        return $this->emit($this->compose($this->sourcePath, $geom, true));
+        return $this->emit($this->compose(
+            $this->sourcePath,
+            $geom,
+            (int) ceil($interstitialWidth),
+            (int) ceil($interstitialHeight),
+            true
+        ));
     }
 
     /**
      * Split -> transform both parts with identical geometry -> re-mux.
      *
      * @param string $source   path to the Ultra HDR JPEG
-     * @param string $geom      ImageMagick geometry operators (resize/crop)
-     * @param bool   $sharpen   apply unsharp to the base (not the gain map)
-     * @return string|false     the resulting Ultra HDR JPEG bytes, or SDR fallback
+     * @param string $geom     ImageMagick geometry operators (resize/crop)
+     * @param int    $hintW    width of the largest intermediate the geometry
+     *                         produces (the decode hint; the final size for a
+     *                         plain resize, the interstitial for a crop)
+     * @param int    $hintH    likewise for height
+     * @param bool   $sharpen  apply unsharp to the base (not the gain map)
+     * @return string|false    the resulting Ultra HDR JPEG bytes, or SDR fallback
      */
-    private function compose($source, $geom, $sharpen)
+    private function compose($source, $geom, $hintW, $hintH, $sharpen)
     {
         $work = $this->tempdir();
         if ($work === false) {
-            return $this->sdrFallback($source, $geom, $sharpen, null);
+            return $this->sdrFallback($source, $geom, $hintW, $hintH, $sharpen, null);
         }
 
         $base = $work . '/base.jpg';
@@ -169,25 +214,59 @@ class DarkroomUltraHDR extends Darkroom
         //    ICC profile: a retained Exif/thumbnail (or stale MPF) confuses
         //    ultrahdr_app's muxing and produces a corrupt multi-SOI JPEG.
         //    `+profile '!icc,*'` drops everything except colour.
-        $this->run($this->magick() . ' ' . escapeshellarg($source . '[0]')
+        $baseCmd = $this->magick() . $this->limitArgs()
+            . $this->decodeHint($hintW, $hintH)
+            . ' ' . escapeshellarg($source . '[0]')
             . ' ' . $geom . $unsharp
             . " +profile '!icc,*'"
             . ' -quality ' . (int) $this->quality
-            . ' ' . escapeshellarg($base));
+            . ' ' . escapeshellarg($base);
 
-        // 2. Gain map: extract (pure PHP), normalise to the source resolution so
-        //    it shares the base's coordinate system, then apply the same geometry.
+        // 2. Gain map: extract (pure PHP) and scale it straight to the base's
+        //    final pixel size. Adobe writes it at the full resolution of the
+        //    original, so it gets the same decode hint as the base. The
+        //    geometry's crop offsets are in base coordinates, so for a crop the
+        //    gain map is first brought to the base's pre-crop (interstitial)
+        //    size, then cropped identically.
         $gmBytes = GainMap::extractGainMap($source);
-        if ($gmBytes === false || !file_exists($base)) {
-            return $this->sdrFallback($source, $geom, $sharpen, $work);
+        if ($gmBytes === false) {
+            return $this->sdrFallback($source, $geom, $hintW, $hintH, $sharpen, $work);
         }
         $gmSrc = $work . '/gm_src.jpg';
         file_put_contents($gmSrc, $gmBytes);
 
-        $this->run($this->magick() . ' ' . escapeshellarg($gmSrc)
-            . ' -resize ' . (int) $this->sourceWidth . 'x' . (int) $this->sourceHeight . '!'
-            . ' ' . $geom
-            . ' -quality 94 -strip ' . escapeshellarg($gm));
+        if (strpos($geom, '-crop') === false) {
+            $gmGeom = '-resize ' . (int) $this->width . 'x' . (int) $this->height . '!';
+        } else {
+            $gmGeom = '-resize ' . $hintW . 'x' . $hintH . '! ' . substr($geom, strpos($geom, '-crop'));
+        }
+
+        $gmCmd = $this->magick() . $this->limitArgs()
+            . $this->decodeHint($hintW, $hintH)
+            . ' ' . escapeshellarg($gmSrc)
+            . ' ' . $gmGeom
+            . ' -quality 94 -strip ' . escapeshellarg($gm);
+
+        // The two resizes are independent; run them side by side.
+        $this->run('{ (' . $baseCmd . ') & (' . $gmCmd . '); wait; }');
+
+        if (!file_exists($base)) {
+            return $this->sdrFallback($source, $geom, $hintW, $hintH, $sharpen, $work);
+        }
+
+        $baseSize = $this->size($base);
+        if ($baseSize === false) {
+            return $this->sdrFallback($source, $geom, $hintW, $hintH, $sharpen, $work, $base);
+        }
+
+        // The mux wants the two images the same size; a one-pixel rounding
+        // difference is corrected here (cheap: the gain map is small by now).
+        $gmSize = $this->size($gm);
+        if ($gmSize !== false && $gmSize !== $baseSize) {
+            $this->run($this->magick() . ' ' . escapeshellarg($gm)
+                . ' -resize ' . $baseSize[0] . 'x' . $baseSize[1] . '!'
+                . ' -quality 94 -strip ' . escapeshellarg($gm));
+        }
 
         // 3. Metadata (cached — resolution independent).
         $meta = $this->metaConfig($source, $work);
@@ -207,7 +286,27 @@ class DarkroomUltraHDR extends Darkroom
             return $blob;
         }
 
-        return $this->sdrFallback($source, $geom, $sharpen, $work, $base);
+        return $this->sdrFallback($source, $geom, $hintW, $hintH, $sharpen, $work, $base);
+    }
+
+    /**
+     * libjpeg can decode at 1/2, 1/4 or 1/8 scale for free (DCT scaling), and
+     * ImageMagick picks the smallest scale that still covers the requested size.
+     * Asking for twice the target keeps full quality through the final resize.
+     */
+    private function decodeHint($w, $h)
+    {
+        if ($w <= 0 || $h <= 0) {
+            return '';
+        }
+        return ' -define jpeg:size=' . (2 * (int) $w) . 'x' . (2 * (int) $h);
+    }
+
+    /** @return array{0:int,1:int}|false pixel size of a JPEG on disk. */
+    private function size($path)
+    {
+        $size = @getimagesize($path);
+        return $size ? array((int) $size[0], (int) $size[1]) : false;
     }
 
     /**
@@ -217,7 +316,7 @@ class DarkroomUltraHDR extends Darkroom
     private function metaConfig($source, $work)
     {
         $key = md5($source . ':' . @filemtime($source));
-        $cache = sys_get_temp_dir() . '/koken_uhdr_' . $key . '.cfg';
+        $cache = $this->metaCacheDir() . '/koken_uhdr_' . $key . '.cfg';
 
         if (file_exists($cache) && filesize($cache) > 0) {
             return $cache;
@@ -234,10 +333,27 @@ class DarkroomUltraHDR extends Darkroom
     }
 
     /**
+     * Where the metadata cache lives: storage/cache/uhdr under the Koken root,
+     * which persists across php-fpm restarts (the service's /tmp usually does
+     * not) and is swept by the same housekeeping as the image cache. Falls
+     * back to the system temp dir if that cannot be created.
+     */
+    private function metaCacheDir()
+    {
+        $dir = dirname(__DIR__, 3) . '/storage/cache/uhdr';
+        if (is_dir($dir) || @mkdir($dir, 0755, true)) {
+            if (is_writable($dir)) {
+                return $dir;
+            }
+        }
+        return sys_get_temp_dir();
+    }
+
+    /**
      * Last resort: emit a valid SDR JPEG (the resized base) so the request never
      * fails, even if the HDR tooling is unavailable.
      */
-    private function sdrFallback($source, $geom, $sharpen, $work, $base = null)
+    private function sdrFallback($source, $geom, $hintW, $hintH, $sharpen, $work, $base = null)
     {
         $unsharp = '';
         if ($sharpen && $this->sharpening) {
@@ -249,7 +365,9 @@ class DarkroomUltraHDR extends Darkroom
         if ($base !== null && file_exists($base)) {
             $blob = file_get_contents($base);
         } else {
-            $blob = shell_exec($this->magick() . ' ' . escapeshellarg($source . '[0]')
+            $blob = shell_exec($this->magick() . $this->limitArgs()
+                . $this->decodeHint($hintW, $hintH)
+                . ' ' . escapeshellarg($source . '[0]')
                 . ' ' . $geom . $unsharp
                 . ' -quality ' . (int) $this->quality . ' jpg:-');
         }

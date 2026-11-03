@@ -34,6 +34,8 @@ Conventions:
 | 500-item cap on `/content` listings removed; default page size still 100 | The front end needed full listings; API responses are cached per URL so a large page is built once per purge | fa9a425 (2026-09-23) | `app/application/models/content.php` |
 | Searching or filtering by a tag that does not exist returns an empty result instead of a 500 | Broke admin search | e429683 (2026-10-02) | `app/application/models/koken.php` |
 | Renditions can be requested as `.webp`: the two URL regexes in `i.php` accept it, the Darkroom gets a `format()` setter and each driver encodes WebP on request, `WebPICC` wraps the extracted ICC profile into an `ICCP` chunk for GD output, the `.1600` midsize lookup uses the original's extension, HDR is skipped for WebP | Smaller thumbnails for the website; gain maps have no WebP container so the big presets stay JPEG | 2026-11-03 | `i.php`, `app/koken/WebPICC.php` (new), `app/koken/Darkroom/Darkroom.php`, `DarkroomGD2.php`, `DarkroomImagick.php`, `DarkroomImageMagick.php` |
+| HDR driver speed-up: `-define jpeg:size` decode hint for the base AND the gain map (Adobe writes the gain map at full resolution), both resizes run in parallel, the gain map is scaled straight to the base's final size instead of being normalised to the original's resolution, `DARKROOM_MAGICK_*` limits passed to every convert call, metadata cache moved from the service's private /tmp to `storage/cache/uhdr/` | HDR renditions took 4–6 s each on hazel, dominated by decoding two 45-megapixel JPEGs at full size and a metadata decode that was repeated after every php-fpm restart | 2026-11-03 | `app/koken/Darkroom/DarkroomUltraHDR.php` |
+| 2x quality floor in `adjustForRetina()` is 35 for WebP output (50 for everything else) | The admin sliders could not take a 2x WebP thumbnail below 50 | dd3af90 (2026-11-03) | `app/koken/Darkroom/Darkroom.php` |
 | `fork_version` returned by the `/system` API call and shown beside the version in the admin Settings and About panels | Tell at a glance which fork build a site runs | ea1a9b5 (2026-10-02), suffix renamed in dece5cd | `app/application/config/koken.php`, `app/application/controllers/system.php`, `admin/templates/app.tmpl.html`, `admin/templates/settings.tmpl.html` |
 
 ## Tooling (not part of the served app)
@@ -57,3 +59,4 @@ Conventions:
 | 1.3.3-sjp.8 | 2026-10-06 | `qt-faststart` on upload |
 | 1.3.3-sjp.9 | 2026-10-18 | Single-frame video posters, regen tool |
 | 1.3.3-sjp.10 | 2026-11-03 | WebP renditions on request |
+| 1.3.3-sjp.11 | 2026-11-03 | HDR render speed-up; WebP 2x quality floor |
