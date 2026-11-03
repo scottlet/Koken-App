@@ -233,7 +233,11 @@ abstract class Darkroom
         if ($this->retina) {
             $this->width *= 2;
             $this->height *= 2;
-            $this->quality = max(50, $this->quality - ($this->quality* 0.15));
+            // A 2x rendition is shown at half size, so it can be compressed
+            // harder, but not without limit. WebP degrades more gracefully
+            // than JPEG, so its floor is lower.
+            $floor = $this->format === 'webp' ? 35 : 50;
+            $this->quality = max($floor, $this->quality - ($this->quality * 0.15));
 
             if ($this->sharpening) {
                 $this->sharpening /= 2;
