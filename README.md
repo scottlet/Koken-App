@@ -4,7 +4,7 @@
 
 This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) with a few additions on top. Everything below this section is the original README.
 
-**Current release: [1.3.3-sjp.9](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.9)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
+**Current release: [1.3.3-sjp.10](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.10)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
 
 | Tag | What changed |
 |---|---|
@@ -17,6 +17,7 @@ This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) 
 | 1.3.3-sjp.7 | Searching or filtering by a tag that does not exist returns no results instead of a 500, which fixes admin search |
 | 1.3.3-sjp.8 | Uploaded videos get `moov` moved to the front with `qt-faststart`, spatial-safe |
 | 1.3.3-sjp.9 | Video posters are the first frame of the video, one file per upload, instead of up to twelve unused frames and a random pick; `tools/regen-video-posters.php` fixes existing videos |
+| 1.3.3-sjp.10 | Any rendition can be requested as WebP by asking for `.webp` instead of the original's extension; the colour profile is kept, HDR presets stay JPEG |
 
 The complete list of changes relative to upstream, with commits and files, is kept in [docs/DEVIATIONS.md](docs/DEVIATIONS.md).
 
@@ -35,6 +36,10 @@ define('KOKEN_HDR_PRESETS', 'xlarge,huge');
 ```
 
 The original's creation date is carried through the conversion.
+
+### WebP renditions
+
+Request any cached rendition with `.webp` in place of the original's extension, for example `411A7743,small.crop.2x.1793553624.webp` next to the `.jpg` the API reports, and Koken resizes and encodes it as WebP instead. The original and every existing URL are untouched, so this is purely additive: a front end can offer WebP in a `srcset` and keep the JPEG as `src`. The ICC profile survives with every driver (GD writes none of its own, so the profile Koken already extracts for JPEG is wrapped into an `ICCP` chunk; Imagick and `convert` keep it through the strip). HDR output is JPEG only, because WebP has no gain-map container, so a `.webp` request for an HDR-eligible preset gets the SDR rendition. Quality and sharpening follow the preset settings as for JPEG. Needs GD built with WebP (`imagewebp`), or an ImageMagick with the WebP delegate.
 
 ### Spatial video (MV-HEVC)
 

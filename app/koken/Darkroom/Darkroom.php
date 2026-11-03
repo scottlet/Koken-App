@@ -26,6 +26,7 @@ abstract class Darkroom
     protected $focalX = 0.5;
     protected $focalY = 0.5;
     protected $stripMetadata = false;
+    protected $format = false;
 
     private $beforeRender = false;
     private $beforeRenderExtraArgs = null;
@@ -133,6 +134,17 @@ abstract class Darkroom
     public function strip()
     {
         $this->stripMetadata = true;
+    }
+
+    /**
+     * Encode the output as a different format from the source. Only 'webp' is
+     * understood; anything else keeps the source format.
+     */
+    public function format($format)
+    {
+        $format = strtolower((string) $format);
+        $this->format = $format === 'webp' ? 'webp' : false;
+        return $this;
     }
 
     public function resize($width, $height = false, $crop = false)

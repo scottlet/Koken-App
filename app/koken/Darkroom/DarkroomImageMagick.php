@@ -57,7 +57,9 @@ class DarkroomImageMagick extends Darkroom
         );
 
         if ($this->stripMetadata) {
-            $this->sourceArgs[] = '-strip';
+            // A format change loses i.php's JPEG-only ICC re-injection, so strip
+            // everything but the colour profile instead.
+            $this->sourceArgs[] = $this->format ? "+profile '!icc,*'" : '-strip';
         }
 
         if ($this->isAnimatedGif) {
@@ -179,10 +181,12 @@ class DarkroomImageMagick extends Darkroom
 
         $cmd = $this->emitBeforeRender($cmd);
 
+        $prefix = $this->format ? $this->format . ':' : '';
+
         if ($this->path) {
-            $cmd .= ' "' . $this->path . '"';
+            $cmd .= ' ' . $prefix . '"' . $this->path . '"';
         } else {
-            $cmd .= ' -';
+            $cmd .= ' ' . $prefix . '-';
         }
 
         return shell_exec($cmd);

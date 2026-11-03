@@ -96,7 +96,13 @@ class DarkroomGD2 extends Darkroom
             $path = null;
         }
 
-        if ($this->sourceType === IMAGETYPE_PNG) {
+        if ($this->format === 'webp' && function_exists('imagewebp')) {
+            if ($this->sourceType === IMAGETYPE_PNG) {
+                imagealphablending($this->finalImage, false);
+                imagesavealpha($this->finalImage, true);
+            }
+            imagewebp($this->finalImage, $path, (int) min($this->quality, 100));
+        } elseif ($this->sourceType === IMAGETYPE_PNG) {
             imagealphablending($this->finalImage, false);
             imagesavealpha($this->finalImage, true);
             imagepng($this->finalImage, $path);

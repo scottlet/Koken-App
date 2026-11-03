@@ -85,18 +85,22 @@
 	$info = pathinfo($cache_key);
 	$ext = $info['extension'];
 
+	// A .webp request re-encodes the rendition as WebP; the original stays
+	// whatever it is. Not combined with HDR (WebP has no gain-map container).
+	$webp = strtolower($ext) === 'webp';
+
 	if (!$cache)
 	{
 		Shutter::write_cache($lock, '');
 
 		$new = $preset = true;
 
-		preg_match('/^\/((?:[0-9]{3}\/[0-9]{3})|custom)\/(.*)[,\/](tiny|small|medium|medium_large|large|xlarge|huge)\.(crop\.)?(2x\.)?(?:\d{9,10}\.)?(?P<ext>jpe?g|gif|png|svg)(\.dl|.64)?$/i', $path, $matches);
+		preg_match('/^\/((?:[0-9]{3}\/[0-9]{3})|custom)\/(.*)[,\/](tiny|small|medium|medium_large|large|xlarge|huge)\.(crop\.)?(2x\.)?(?:\d{9,10}\.)?(?P<ext>jpe?g|gif|png|svg|webp)(\.dl|.64)?$/i', $path, $matches);
 
 		// If $matches is empty, they are requesting a custom size
 		if (empty($matches))
 		{
-			preg_match('/^\/((?:[0-9]{3}\/[0-9]{3})|custom)\/(.*)[,\/]([0-9]+)\.([0-9]+)\.([0-9]{1,3})\.([0-9]{1,3})\.(crop\.)?(2x\.)?(?:\d{9,10}\.)?(?P<ext>jpe?g|gif|png|svg)(\.dl|.64)?$/i', $path, $matches);
+			preg_match('/^\/((?:[0-9]{3}\/[0-9]{3})|custom)\/(.*)[,\/]([0-9]+)\.([0-9]+)\.([0-9]{1,3})\.([0-9]{1,3})\.(crop\.)?(2x\.)?(?:\d{9,10}\.)?(?P<ext>jpe?g|gif|png|svg|webp)(\.dl|.64)?$/i', $path, $matches);
 			$preset = false;
 		}
 
@@ -211,7 +215,7 @@
 			// derivative stays HDR. Output is still a .jpg, so nothing downstream
 			// (routing, MIME, markup) changes — only the resize path differs.
 			$hdr = false;
-			if (defined('ULTRAHDR_PATH') && !$remoteSource)
+			if (defined('ULTRAHDR_PATH') && !$remoteSource && !$webp)
 			{
 				$hdr_presets = defined('KOKEN_HDR_PRESETS') ? array_map('trim', explode(',', KOKEN_HDR_PRESETS)) : array('xlarge', 'huge');
 				$hdr_eligible = $preset ? in_array($matches[3], $hdr_presets, true) : (max($w, $h) >= 1600);
@@ -251,13 +255,20 @@
 				}
 			}
 
-			$midsize = preg_replace('/\.' . $info['extension'] . '$/', '.1600.' . $info['extension'], $original);
+			// The midsize sits next to the original with the ORIGINAL's extension
+			// (the request's may differ, e.g. .webp).
+			$midsize = preg_replace('/\.([^.\/]+)$/', '.1600.$1', $original);
 
 			$d->read($original, $source_width, $source_height)
 			  ->resize($w, $h, $crop)
 			  ->quality($q)
 			  ->sharpen($sh)
 			  ->focus($content['focal_point']['x'], $content['focal_point']['y']);
+
+			if ($webp)
+			{
+				$d->format('webp');
+			}
 
 			if ($remoteSource)
 			{
@@ -312,7 +323,16 @@
 
 			if (isset($icc))
 			{
-				$blob = $icc->SaveToBlob($blob);
+				if ($webp)
+				{
+					// icc.php only knows JPEG APP2 segments; WebP wants an ICCP chunk.
+					require_once($root . $ds . 'app' . $ds . 'koken' . $ds . 'WebPICC.php');
+					$blob = WebPICC::embed($blob, $icc->GetProfile());
+				}
+				else
+				{
+					$blob = $icc->SaveToBlob($blob);
+				}
 			}
 
 

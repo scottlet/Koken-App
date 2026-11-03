@@ -48,7 +48,12 @@ class DarkroomImagick extends Darkroom
     private function setLimits($image)
     {
         if ($this->limits['thread']) {
-            $image->setResourceLimit(6, $this->limits['thread']);
+            // The literal 6 was ImageMagick 6's thread resource; under IM7 the
+            // enum shifted and 6 is MEMORY, so the old call set the memory
+            // limit to a few bytes. Use the named constant where the
+            // extension provides it.
+            $thread = defined('Imagick::RESOURCETYPE_THREAD') ? Imagick::RESOURCETYPE_THREAD : 6;
+            $image->setResourceLimit($thread, $this->limits['thread']);
         }
 
         if ($this->limits['memory']) {
@@ -70,7 +75,13 @@ class DarkroomImagick extends Darkroom
         $this->image->readImage($this->sourcePath);
 
         if ($this->stripMetadata) {
+            // A format change loses i.php's JPEG-only ICC re-injection, so keep
+            // the profile through the strip ourselves (libwebp writes it as ICCP).
+            $icc = $this->format ? $this->image->getImageProfiles('icc', true) : array();
             $this->image->stripImage();
+            if (!empty($icc['icc'])) {
+                $this->image->profileImage('icc', $icc['icc']);
+            }
         }
 
         if ($this->isAnimatedGif) {
@@ -132,6 +143,10 @@ class DarkroomImagick extends Darkroom
         }
 
         $this->image = $this->emitBeforeRender($this->image);
+
+        if ($this->format) {
+            $this->image->setImageFormat($this->format);
+        }
 
         if ($this->path) {
             if ($this->isAnimatedGif) {
