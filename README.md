@@ -4,7 +4,7 @@
 
 This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) with a few additions on top. Everything below this section is the original README.
 
-**Current release: [1.3.3-sjp.8](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.8)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
+**Current release: [1.3.3-sjp.9](https://github.com/scottlet/Koken-App/releases/tag/1.3.3-sjp.9)**, based on upstream Koken 1.3.3. `KOKEN_VERSION` stays at 1.3.3; fork builds are tagged `1.3.3-sjp.N`. Builds 1 to 5 used an `hdr` suffix, from when the fork was only about HDR; the numbering carries on unbroken. When following the setup or update instructions below, download the zip for this fork's tag from https://github.com/scottlet/Koken-App/tags instead of the upstream one.
 
 | Tag | What changed |
 |---|---|
@@ -16,8 +16,11 @@ This is a fork of [modufolio/Koken-App](https://github.com/modufolio/Koken-App) 
 | 1.3.3-sjp.6 | Videos shorter than 4 seconds no longer fail on upload; tag suffix changed from `hdr` to `sjp` |
 | 1.3.3-sjp.7 | Searching or filtering by a tag that does not exist returns no results instead of a 500, which fixes admin search |
 | 1.3.3-sjp.8 | Uploaded videos get `moov` moved to the front with `qt-faststart`, spatial-safe |
+| 1.3.3-sjp.9 | Video posters are the first frame of the video, one file per upload, instead of up to twelve unused frames and a random pick; `tools/regen-video-posters.php` fixes existing videos |
 
-The admin shows the fork build beside the version, for example "1.3.3 (sjp.8)", under Settings and in the About panel. It comes from `KOKEN_FORK_VERSION` in `app/application/config/koken.php`, which is bumped with each fork tag, and is also returned as `fork_version` by the `/system` API call.
+The complete list of changes relative to upstream, with commits and files, is kept in [docs/DEVIATIONS.md](docs/DEVIATIONS.md).
+
+The admin shows the fork build beside the version, for example "1.3.3 (sjp.9)", under Settings and in the About panel. It comes from `KOKEN_FORK_VERSION` in `app/application/config/koken.php`, which is bumped with each fork tag, and is also returned as `fork_version` by the `/system` API call.
 
 ### HDR (gain-map) images
 
@@ -51,6 +54,8 @@ Requires ffmpeg 7.1 or later and the [`spatial`](https://blog.mikeswanson.com) C
 - `content.filesize` is now a `BIGINT`, so uploads over 2 GB no longer fail (migration 0043).
 - Uploaded videos get their `moov` atom moved to the front with `qt-faststart`, so playback can start before the whole file has downloaded. Phones write it at the end. `qt-faststart` ships with ffmpeg and is looked for next to the ffmpeg binary or on `PATH`; set `QT_FASTSTART_PATH` in `user_setup.php` if it lives elsewhere. Uploads are left untouched if it is missing. Unlike an ffmpeg remux, this preserves spatial video and phone metadata tracks byte for byte.
 - Videos shorter than 4 seconds no longer fail on upload, and every video gets its shot date as `captured_on`.
+- Video posters are the first frame of the video, a single file per upload. Upstream extracted up to twelve full-size frames per video, kept them all, and picked one from an unsorted directory listing, so the poster was effectively random. Run `tools/regen-video-posters.php` once to redo the poster for existing videos and delete their unused frames: copy that one file anywhere on the server, then as the owner of `storage/` run it with `--root=/path/to/koken --dry-run` first and without `--dry-run` to apply.
+- `tools/` is not part of the site and does not need to be deployed. If it is, `tools/.htaccess` denies all web requests to it on Apache; on nginx add an equivalent `location /tools/ { deny all; }`.
 - The 500-item cap on `/content` API listings has been removed. The default page size is still 100 when no `limit` is passed. API responses are cached per URL, so a large page is only built once per cache purge.
 
 ---

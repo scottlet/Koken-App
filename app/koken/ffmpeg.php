@@ -39,55 +39,37 @@ class FFmpeg
         exec($this->ffmpeg . " -i \"{$this->path}\" 2>&1", $this->info);
     }
 
+    /**
+     * Write the poster frame for this video and return the lg_preview value
+     * ("<file>:50:50"), or null if no frame could be extracted.
+     *
+     * The poster is the first frame of the video. Upstream sampled up to
+     * twelve full-resolution frames into the _previews directory and then
+     * chose one from an unsorted directory listing, so the poster was
+     * effectively random and the other frames sat unused on disk. Only the
+     * one frame is written now, and whatever was in the directory before is
+     * removed, so replacing a video replaces its poster.
+     */
     public function create_thumbs()
     {
         $target_directory = dirname($this->path) . DIRECTORY_SEPARATOR . basename($this->path) . '_previews' . DIRECTORY_SEPARATOR;
         make_child_dir($target_directory);
-        $duration = $this->duration() - 2;
-        $bits = ceil($duration/12);
-        if ($bits == 0) {
-            $bits = 1;
-        }
-        $rate = 1/$bits;
-        if ($rate < 0.1) {
-            $rate = 0.1;
-        }
 
-        $i = 1;
-        $cmd = [];
-        while ($i < $duration) {
-            $i_str = str_pad($i, 5, '0', STR_PAD_LEFT);
-            $cmd[] = $this->ffmpeg . " -ss $i -i \"{$this->path}\" -vframes 1 -an -f mjpeg \"$i_str.jpg\"";
-            $i += $bits;
-        }
-
-        // Clips under ~4s produce no sample points above (the loop starts at
-        // 1s and stops 2s short of the end). An empty command list used to be
-        // a harmless warning; on PHP 8 exec('') is a fatal ValueError, which
-        // surfaced as a bare 500 on upload. Take one frame from the midpoint
-        // instead so every video gets a preview.
-        if (empty($cmd)) {
-            $mid = (int) max(0, floor($this->duration() / 2));
-            $mid_str = str_pad($mid, 5, '0', STR_PAD_LEFT);
-            $cmd[] = $this->ffmpeg . " -ss $mid -i \"{$this->path}\" -vframes 1 -an -f mjpeg \"$mid_str.jpg\"";
-        }
-
-        chdir($target_directory);
-        if (DIRECTORY_SEPARATOR == '\\') {
-            foreach ($cmd as $c) {
-                exec($c);
+        foreach (glob($target_directory . '*') ?: [] as $old) {
+            if (is_file($old)) {
+                @unlink($old);
             }
-        } else {
-            $cmd = implode(' && ', $cmd);
-            exec($cmd);
         }
 
-        $files = directory_map($target_directory, true);
-        if ($files) {
-            return $files[ max(0, floor(count($files)/2)-1) ] . ':50:50';
-        } else {
-            return null;
+        $name = '00000.jpg';
+        $out = $target_directory . $name;
+        exec($this->ffmpeg . ' -nostdin -y -i ' . escapeshellarg($this->path) . ' -frames:v 1 -an -f mjpeg ' . escapeshellarg($out) . ' 2>&1', $output, $status);
+        if ($status === 0 && is_file($out) && filesize($out) > 0) {
+            return $name . ':50:50';
         }
+
+        @unlink($out);
+        return null;
     }
 
     public function dimensions()
